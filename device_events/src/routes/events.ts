@@ -89,6 +89,8 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
       severity,
       start_time,
       end_time,
+      event_data_key,
+      event_data_value,
       limit = '100',
       offset = '0',
     } = req.query as Record<string, string>;
@@ -126,6 +128,18 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
       params.push(new Date(end_time));
     }
 
+    if (event_data_key) {
+      if (event_data_value !== undefined) {
+        // Query by specific key-value pair in JSONB
+        conditions.push(`event_data->>$${paramCount++} = $${paramCount++}`);
+        params.push(event_data_key, event_data_value);
+      } else {
+        // Query by key existence in JSONB
+        conditions.push(`event_data ? $${paramCount++}`);
+        params.push(event_data_key);
+      }
+    }
+
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     // Get total count
@@ -133,27 +147,52 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
     const countResult = await db.query(countQuery, params);
     const total = parseInt(countResult.rows[0].count);
 
-    // Get paginated results
+    // Get paginated results - one query with JOIN, returning only latest event per device
     const dataQuery = `
-      SELECT id, device_id, event_type, event_data, severity, ttl, timestamp, created_at
-      FROM device_events
-      ${whereClause}
-      ORDER BY timestamp DESC
+      SELECT 
+        de.id, 
+        de.device_id, 
+        de.event_type, 
+        de.event_data, 
+        de.severity, 
+        de.ttl, 
+        de.timestamp, 
+        de.created_at,
+        d.device_name,
+        d.manufacturer,
+        d.model,
+        d.firmware_version,
+        d.location
+      FROM (
+        SELECT *,
+          ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY timestamp DESC) as rn
+        FROM device_events
+        ${whereClause}
+      ) de
+      LEFT JOIN devices d ON de.device_id = d.device_id
+      WHERE de.rn = 1
+      ORDER BY de.timestamp DESC
       LIMIT $${paramCount++} OFFSET $${paramCount++}
     `;
     const dataResult = await db.query(dataQuery, [...params, queryLimit, queryOffset]);
 
-    const eventsWithDeviceInfo = [];
-    for (const event of dataResult.rows) {
-      const deviceQuery = await db.query(
-        'SELECT device_name, manufacturer, model, firmware_version, location FROM devices WHERE device_id = $1',
-        [event.device_id]
-      );
-      eventsWithDeviceInfo.push({
-        ...event,
-        device_info: deviceQuery.rows[0] || null,
-      });
-    }
+    const eventsWithDeviceInfo = dataResult.rows.map((event: any) => ({
+      id: event.id,
+      device_id: event.device_id,
+      event_type: event.event_type,
+      event_data: event.event_data,
+      severity: event.severity,
+      ttl: event.ttl,
+      timestamp: event.timestamp,
+      created_at: event.created_at,
+      device_info: event.device_name ? {
+        device_name: event.device_name,
+        manufacturer: event.manufacturer,
+        model: event.model,
+        firmware_version: event.firmware_version,
+        location: event.location,
+      } : null,
+    }));
 
     const response: QueryEventsResponse = {
       events: eventsWithDeviceInfo,

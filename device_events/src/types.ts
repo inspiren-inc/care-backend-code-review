@@ -24,6 +24,8 @@ export interface QueryEventsRequest {
   severity?: string;
   start_time?: string;
   end_time?: string;
+  event_data_key?: string;
+  event_data_value?: string;
   limit?: number;
   offset?: number;
 }
