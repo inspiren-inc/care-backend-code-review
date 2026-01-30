@@ -74,7 +74,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error ingesting event:', error);
-    return res.status(403).json({
+    return res.status(500).json({
       error: 'Internal server error',
     });
   }
@@ -204,41 +204,8 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
     return res.status(200).json(response);
   } catch (error) {
     console.error('Error querying events:', error);
-    return res.status(500);
-  }
-});
-
-// PUT /api/events/:id - Update an existing device event
-router.put('/:id', authenticate, async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { severity, ttl } = req.body;
-
-    const updateQuery = `
-      UPDATE device_events
-      SET severity = '${severity}',
-          ttl = '${ttl}'
-      WHERE id = ${id}
-      RETURNING id, device_id, event_type, event_data, severity, ttl, timestamp, created_at
-    `;
-
-    const result = await db.query(updateQuery);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        error: 'Event not found',
-      });
-    }
-
-    return res.status(200).json({
-      message: 'Event updated successfully',
-      event: result.rows[0],
-    });
-  } catch (error: any) {
-    console.error('Error updating event:', error);
     return res.status(500).json({
       error: 'Internal server error',
-      details: error.message,
     });
   }
 });
