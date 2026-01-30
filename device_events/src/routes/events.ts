@@ -210,4 +210,17 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/events/event-activity
+router.get('/event-activity', authenticate, async (req: Request, res: Response) => {
+  try {
+    const { eventsPerHour, startDate, endDate } = req.query as Record<string, string>;
+
+    //TODO: implement endpoint to get all devices which have more than `eventsPerHour` events per hour in the given time range
+  } catch (error) {
+    console.error('Error querying event activity:', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+    });
+  }
+
 export default router;
