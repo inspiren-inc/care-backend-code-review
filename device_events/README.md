@@ -211,52 +211,6 @@ GET /api/events?limit=50&offset=100
 }
 ```
 
-### 3. Update Event Severity and TTL
-
-Update the severity level and time-to-live of an existing event.
-
-**Endpoint:** `PUT /api/events/:id`
-
-**Headers:**
-```
-x-api-token: <your-api-token>
-Content-Type: application/json
-```
-
-**Request Body:**
-```json
-{
-  "severity": "critical",
-  "ttl": "2026-01-15T00:00:00Z"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "message": "Event updated successfully",
-  "event": {
-    "id": 1,
-    "device_id": "device-123",
-    "event_type": "temperature_reading",
-    "event_data": {
-      "temperature": 72.5,
-      "unit": "fahrenheit",
-      "location": "warehouse-a"
-    },
-    "severity": "critical",
-    "ttl": "2026-01-15T00:00:00.000Z",
-    "timestamp": "2025-10-22T12:00:00.000Z",
-    "created_at": "2025-10-22T12:00:01.000Z"
-  }
-}
-```
-
-**Error Responses:**
-- `401 Unauthorized` - Missing or invalid API token
-- `404 Not Found` - Event ID not found
-- `500 Internal Server Error` - Server error
-
 ## Testing with curl
 
 ### Ingest an Event
@@ -294,17 +248,6 @@ curl -H "x-api-token: sk_prod_1234567890abcdef" \
 # Get events with pagination
 curl -H "x-api-token: sk_prod_1234567890abcdef" \
   "http://localhost:3000/api/events?limit=10&offset=0"
-```
-
-### Update an Event
-```bash
-curl -X PUT http://localhost:3000/api/events/1 \
-  -H "Content-Type: application/json" \
-  -H "x-api-token: sk_prod_1234567890abcdef" \
-  -d '{
-    "severity": "critical",
-    "ttl": "2026-01-01T00:00:00Z"
-  }'
 ```
 
 ## Database Schema
