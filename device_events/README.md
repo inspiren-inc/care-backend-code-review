@@ -4,10 +4,9 @@ A TypeScript-based Express.js service for ingesting and querying device events w
 
 ## Overview
 
-This service provides three main APIs:
-1. **Ingest API** - Submit new device events with severity and TTL
+This service provides two main APIs:
+1. **Ingest API** - Submit new device events
 2. **Query API** - Retrieve device events with filtering and pagination
-3. **Update API** - Update event severity and expiration
 
 **Authentication:** All API endpoints require an API token via the `x-api-token` header.
 
