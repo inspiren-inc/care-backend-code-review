@@ -8,6 +8,8 @@ This service provides two main APIs:
 1. **Ingest API** - Submit new device events
 2. **Query API** - Retrieve device events with filtering and pagination
 
+**Authentication:** All API endpoints require an API token via the `x-api-token` header.
+
 ## Prerequisites
 
 - Node.js 18+ and npm
@@ -87,6 +89,12 @@ Submit a new device event to the system.
 
 **Endpoint:** `POST /api/events`
 
+**Headers:**
+```
+x-api-token: <your-api-token>
+Content-Type: application/json
+```
+
 **Request Body:**
 ```json
 {
@@ -97,6 +105,8 @@ Submit a new device event to the system.
     "unit": "fahrenheit",
     "location": "warehouse-a"
   },
+  "severity": "high",
+  "ttl": "2025-12-31T23:59:59Z",
   "timestamp": "2025-10-22T12:00:00Z"
 }
 ```
@@ -105,6 +115,8 @@ Submit a new device event to the system.
 - `device_id` (required): Unique identifier for the device
 - `event_type` (required): Type of event (e.g., "temperature_reading", "motion_detected")
 - `event_data` (required): JSON object containing event-specific data
+- `severity` (optional): Event severity level (free text)
+- `ttl` (optional): Time-to-live - when the event should expire
 - `timestamp` (optional): Event timestamp (defaults to current time)
 
 **Response (201 Created):**
@@ -120,11 +132,18 @@ Submit a new device event to the system.
       "unit": "fahrenheit",
       "location": "warehouse-a"
     },
+    "severity": "high",
+    "ttl": "2025-12-31T23:59:59.000Z",
     "timestamp": "2025-10-22T12:00:00.000Z",
     "created_at": "2025-10-22T12:00:01.000Z"
   }
 }
 ```
+
+**Error Responses:**
+- `401 Unauthorized` - Missing or invalid API token
+- `400 Bad Request` - Missing required fields or invalid data
+- `500 Internal Server Error` - Server error
 
 ### 2. Query Device Events
 
@@ -132,9 +151,15 @@ Retrieve device events with optional filtering and pagination.
 
 **Endpoint:** `GET /api/events`
 
+**Headers:**
+```
+x-api-token: <your-api-token>
+```
+
 **Query Parameters:**
 - `device_id` (optional): Filter by specific device
 - `event_type` (optional): Filter by event type
+- `severity` (optional): Filter by severity level
 - `start_time` (optional): Filter events after this timestamp (ISO 8601)
 - `end_time` (optional): Filter events before this timestamp (ISO 8601)
 - `limit` (optional): Number of results per page (default: 100, max: 1000)
@@ -148,6 +173,9 @@ GET /api/events?device_id=device-123
 
 # Get events by type within a time range
 GET /api/events?event_type=temperature_reading&start_time=2025-10-22T00:00:00Z&end_time=2025-10-22T23:59:59Z
+
+# Get high severity events
+GET /api/events?severity=high
 
 # Paginated results
 GET /api/events?limit=50&offset=100
@@ -166,8 +194,14 @@ GET /api/events?limit=50&offset=100
         "unit": "fahrenheit",
         "location": "warehouse-a"
       },
+      "severity": "high",
+      "ttl": "2025-12-31T23:59:59.000Z",
       "timestamp": "2025-10-22T12:00:00.000Z",
-      "created_at": "2025-10-22T12:00:01.000Z"
+      "created_at": "2025-10-22T12:00:01.000Z",
+      "metadata": {
+        "device_id": "device-123",
+        "event_type": "temperature_reading"
+      }
     }
   ],
   "total": 150,
@@ -182,6 +216,7 @@ GET /api/events?limit=50&offset=100
 ```bash
 curl -X POST http://localhost:3000/api/events \
   -H "Content-Type: application/json" \
+  -H "x-api-token: sk_prod_1234567890abcdef" \
   -d '{
     "device_id": "sensor-001",
     "event_type": "temperature_reading",
@@ -189,20 +224,29 @@ curl -X POST http://localhost:3000/api/events \
       "temperature": 68.2,
       "humidity": 45,
       "unit": "fahrenheit"
-    }
+    },
+    "severity": "medium",
+    "ttl": "2025-12-31T23:59:59Z"
   }'
 ```
 
 ### Query Events
 ```bash
 # Get all events
-curl http://localhost:3000/api/events
+curl -H "x-api-token: sk_prod_1234567890abcdef" \
+  http://localhost:3000/api/events
 
 # Get events for a specific device
-curl "http://localhost:3000/api/events?device_id=sensor-001"
+curl -H "x-api-token: sk_prod_1234567890abcdef" \
+  "http://localhost:3000/api/events?device_id=sensor-001"
+
+# Get high severity events
+curl -H "x-api-token: sk_prod_1234567890abcdef" \
+  "http://localhost:3000/api/events?severity=high"
 
 # Get events with pagination
-curl "http://localhost:3000/api/events?limit=10&offset=0"
+curl -H "x-api-token: sk_prod_1234567890abcdef" \
+  "http://localhost:3000/api/events?limit=10&offset=0"
 ```
 
 ## Database Schema
@@ -215,6 +259,8 @@ curl "http://localhost:3000/api/events?limit=10&offset=0"
 | device_id   | VARCHAR(255)             | Device identifier                    |
 | event_type  | VARCHAR(100)             | Type of event                        |
 | event_data  | JSONB                    | Event payload (flexible JSON)        |
+| severity    | TEXT                     | Event severity level (free text)     |
+| ttl         | TIMESTAMP WITH TIME ZONE | Event expiration timestamp           |
 | timestamp   | TIMESTAMP WITH TIME ZONE | Event occurrence time                |
 | created_at  | TIMESTAMP WITH TIME ZONE | Record creation time                 |
 
@@ -239,6 +285,14 @@ docker-compose down
 docker-compose down -v
 ```
 
+## Authentication
+
+All API endpoints require authentication using an API token.
+
+**Header:** `x-api-token: <your-api-token>`
+
+For local development and testing, use the token: `sk_prod_1234567890abcdef`
+
 ## Architecture Notes
 
 - **Express.js** - Lightweight web framework
@@ -246,4 +300,11 @@ docker-compose down -v
 - **PostgreSQL** - RDS-compatible relational database with JSONB support
 - **pg** - Non-blocking PostgreSQL client for Node.js
 - **JSONB** - Flexible event storage without rigid schema requirements
+
+---
+
+## Code Review Exercise
+
+
+**Goal:** Review the code and identify security vulnerabilities, performance issues, data validation problems, and API design concerns.
 

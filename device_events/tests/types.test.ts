@@ -229,7 +229,11 @@ describe('Type Definitions', () => {
       };
 
       const event: DeviceEvent = {
-        ...request,
+        device_id: request.device_id,
+        event_type: request.event_type,
+        event_data: request.event_data,
+        severity: request.severity,
+        ttl: request.ttl ? new Date(request.ttl) : undefined,
         timestamp: request.timestamp ? new Date(request.timestamp) : undefined,
       };
 
